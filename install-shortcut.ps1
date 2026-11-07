@@ -83,8 +83,9 @@ Write-Host ('  启动脚本: ' + $server)
 Write-Host ''
 
 if (-not $pythonw) {
-    Write-Error ('找不到 Python 解释器。请设置 ACCOUNT_MANAGER_PYTHONW 环境变量，'
-        + '或在工具目录放一份 python\pythonw.exe')
+    $msg = '找不到 Python 解释器。请设置 ACCOUNT_MANAGER_PYTHONW 环境变量，' +
+           '或在工具目录放一份 python\pythonw.exe'
+    Write-Error $msg
 }
 foreach ($path in @($pythonw, $server)) {
     if (-not (Test-Path -LiteralPath $path)) {
