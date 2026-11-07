@@ -1,0 +1,466 @@
+/* 配色与 E:\git_src\xianyu\account-manager 保持同一套：
+   米黄羊皮纸底 + 金棕主色，标题/正文用暖褐色。 */
+:root {
+  --bg: #efdfc0;
+  --panel: #fdf8ec;
+  --panel2: #f3e6c8;
+  --line: #dcc494;
+  --text: #43301c;
+  --muted: #967e5d;
+  --accent: #ad7d24;
+  --accent2: #7d5a17;
+  --accent-soft: #fdf3d9;
+  --danger: #b04e30;
+  --ok: #6b8f4e;
+  --warn: #bf8a20;
+  --bad: #b04e30;
+  --info: #ad7d24;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 14px/1.6 "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+code {
+  font-family: Consolas, monospace; background: var(--panel2);
+  padding: 0 4px; border-radius: 3px; color: var(--accent2);
+}
+
+header {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  padding: 12px 20px;
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+header h1 { font-size: 15px; margin: 0 12px 0 0; font-weight: 600; }
+label.field { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+select, input[type="text"], textarea {
+  font: inherit; font-size: 13px; color: var(--text);
+  background: #fffdf6; border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 9px;
+}
+select:focus, input:focus, textarea:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(173, 125, 36, .15);
+}
+button {
+  font: inherit; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel2); color: var(--text);
+  border-radius: 7px; padding: 6px 11px;
+  transition: .15s;
+}
+button:hover:not(:disabled) {
+  border-color: var(--accent); background: var(--accent); color: #fff;
+}
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button.primary:hover:not(:disabled) { filter: brightness(1.1); background: var(--accent); }
+button.danger { color: var(--danger); }
+button.danger:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+main { padding: 16px 20px 90px; max-width: 1180px; margin: 0 auto; }
+/* 方块视图铺满整个窗口宽度（列表视图保持 1180 便于阅读） */
+main.grid-mode { max-width: none; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.toolbar .spacer { flex: 1 1 auto; }
+.hint { color: var(--muted); font-size: 12px; }
+.warnbar {
+  background: var(--accent-soft); border: 1px solid #e3c98a; color: var(--accent2);
+  border-radius: 8px; padding: 9px 13px; margin-bottom: 12px; font-size: 13px;
+}
+.stat { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.stat b { color: var(--text); font-weight: 600; font-size: 15px; }
+
+/* 任务特有的只读信息条（切号任务的轮换指针等） */
+.taskinfo {
+  background: var(--panel2); border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px; padding: 8px 13px; margin-bottom: 12px;
+  font-size: 12px; color: var(--text); line-height: 1.7;
+  word-break: break-all;
+}
+
+#list { display: flex; flex-direction: column; }
+
+/* ---------- 方块视图：从左到右、从上到下 ---------- */
+/* --grid-cols 由 app.js 按「每行」下拉设置（4 / 8 …）；
+   没设置时用 auto-fill 按窗口宽度自动排。
+   用户账号一般 4 个一组，固定 4 列时一组正好占满一行。 */
+#list.grid-view {
+  display: grid;
+  /* auto：240px 起，容纳「协战 昨天 18:17」+ 平台 + 编号一行不截断 */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+#list.grid-view.fixed-cols {
+  /* 固定列数：等宽平分，窗口再窄也不换行（宁可卡片变窄） */
+  grid-template-columns: repeat(var(--grid-cols), minmax(0, 1fr));
+}
+/* 方块视图：4 个子元素（⠿ / 序号 / 正文 / 操作），必须是 4 列。
+   原来写成 3 列，第 4 个元素 actions 被挤到第二行第 1 列（只有 22px 宽），
+   里面「删除」两个字（22px + 左右内边距）就溢出按钮了。 */
+#list.grid-view .card.compact {
+  grid-template-columns: 16px 18px 1fr auto;
+  gap: 6px;
+  padding: 6px 8px;
+  height: 100%;          /* 同一行内等高 */
+  box-sizing: border-box;
+}
+#list.grid-view .card.compact .idx { font-size: 11px; }
+#list.grid-view .card.compact .handle { font-size: 12px; }
+#list.grid-view .card.compact .row1 { flex-direction: column; gap: 2px; }
+#list.grid-view .card.compact .char {
+  font-size: 13px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 100%;
+}
+#list.grid-view .card.compact .acc {
+  font-size: 10px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 100%;
+}
+#list.grid-view .card.compact .row1 .tag {
+  align-self: flex-start;   /* 标签按内容宽, 不被拉伸 */
+  max-width: 100%;
+}
+#list.grid-view .card.compact .row2 {
+  /* 每个数据项独占一行：协战时间 / 平台 / 区服 / 编号 各自换行，
+     不再挤在一行里互相压缩导致显示不全 */
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px; margin-top: 3px;
+  overflow: visible;
+}
+#list.grid-view .card.compact .row2 .tag {
+  font-size: 10px; padding: 0 5px;
+  flex: 0 0 auto;          /* 按完整内容显示，不压缩 */
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis;
+}
+#list.grid-view .card.compact .row2 .tag.time {
+  /* 竖排后每行都有完整宽度，不再需要省略号压缩 */
+  flex: 0 0 auto; max-width: 100%;
+}
+/* 区服：竖排后给足宽度，长名字才省略（原来限死 72px 会显示不全） */
+#list.grid-view .card.compact .row2 .tag.svr {
+  flex: 0 0 auto; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis;
+}
+#list.grid-view .card.compact .actions {
+  flex-direction: column; gap: 2px;
+  align-items: stretch;
+}
+#list.grid-view .card.compact .actions button {
+  padding: 1px 6px; font-size: 11px;
+  white-space: nowrap;     /* 「删除」不竖排断字 */
+}
+
+/* 视图切换按钮组 */
+.view-toggle { display: inline-flex; }
+.view-toggle button {
+  border-radius: 0;
+  margin-left: -1px;
+}
+.view-toggle button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+.view-toggle button:last-child { border-radius: 0 6px 6px 0; }
+.view-toggle button.active {
+  background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
+}
+.card {
+  display: grid;
+  grid-template-columns: 30px 34px 1fr auto;
+  gap: 10px; align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 9px 12px;
+  box-shadow: 0 1px 3px rgba(125, 90, 23, .10);
+  transition: .15s;
+}
+.card:hover { border-color: #c9a75f; }
+.card.dragging { opacity: .4; }
+.card.drop-before { box-shadow: 0 -2px 0 0 var(--accent); }
+.card.drop-after { box-shadow: 0 2px 0 0 var(--accent); }
+.card .idx { text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+.card .handle { cursor: grab; color: var(--muted); text-align: center; user-select: none; }
+.card .handle:active { cursor: grabbing; }
+.card .main { min-width: 0; cursor: pointer; }
+.card .row1 { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.card .char { font-weight: 600; font-size: 14px; }
+.card .acc { color: var(--muted); font-size: 12px; word-break: break-all; }
+/* 每个数据项独占一行（协战时间 / 平台 / 区服 / 别名 / 编号），
+   避免挤在一行时被压缩截断 */
+.card .row2 {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px; margin-top: 4px;
+}
+.card .row2 .tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.card .actions { display: flex; gap: 4px; }
+.card.empty .char { color: var(--muted); font-style: italic; font-weight: 400; }
+.card.empty { border-style: dashed; }
+
+/* 卡片之间的插入条 */
+.insert-bar {
+  display: flex; align-items: center; gap: 8px;
+  height: 14px; padding: 0 4px; opacity: 0; transition: opacity .12s;
+}
+.insert-bar.on { opacity: 1; }
+.insert-bar .line { flex: 1 1 auto; height: 1px; background: var(--line); }
+.insert-bar button {
+  font-size: 11px; padding: 0 8px; line-height: 16px;
+  border-radius: 8px; color: var(--muted); background: var(--panel);
+}
+.insert-bar button:hover:not(:disabled) { background: var(--accent); color: #fff; }
+
+.tag {
+  font-size: 11px; padding: 1px 8px; border-radius: 9px;
+  border: 1px solid var(--line); background: #fffdf6; color: var(--muted);
+}
+.tag.android { color: #52713a; border-color: #bcd0ab; background: #e9f0e2; }
+.tag.ios { color: #9c6f10; border-color: #e3c98a; background: #fdf3d9; }
+.tag.warn { color: #9c6f10; border-color: #e3c98a; background: #fdf3d9; }
+.tag.alias { color: #7d5a17; border-color: #dcc494; background: var(--panel2); }
+.tag.dup { color: var(--bad); border-color: #e0b0a4; background: #f9e4de; }
+.tag.idtag { color: var(--accent2); border-color: #dcc494; background: var(--panel2); font-variant-numeric: tabular-nums; }
+button:disabled, select:disabled { cursor: not-allowed; }
+
+/* ---------- 运行状态：今天已执行 / 今天未执行 / 从未执行 ---------- */
+/* 整卡左侧色条 + 状态标签双重区分，扫一眼就能看出哪些今天没跑 */
+.card { border-left: 4px solid transparent; }
+
+.card.run-today {
+  border-left-color: var(--ok);
+  background: #f7faef;
+}
+.card.run-today .char { color: #52713a; }
+
+.card.run-stale {
+  border-left-color: var(--warn);
+  background: #fefaf0;
+}
+
+.card.run-never {
+  border-left-color: #b3a184;
+  background: #fbf8f1;
+}
+
+.tag.run { font-weight: 600; }
+.tag.run.today { color: #52713a; border-color: #bcd0ab; background: #e9f0e2; }
+.tag.run.stale { color: #9c6f10; border-color: #e3c98a; background: #fdf3d9; }
+.tag.run.never { color: var(--muted); border-color: #e2d5b8; background: var(--panel2); }
+
+.tag.time { font-variant-numeric: tabular-nums; }
+.tag.time.today { color: #52713a; border-color: #cfe0bf; background: #f2f7ea; }
+.tag.time.stale { color: #9c6f10; border-color: #e3c98a; background: #fefaf0; }
+.tag.time.never { color: #a89878; }
+
+/* 顶部状态筛选 */
+#run-filter { min-width: 132px; }
+.stat .run-today-count b { color: var(--ok); }
+.stat .run-stale-count b { color: var(--warn); }
+
+/* ---------- 勾协状态标签（一键协战） ---------- */
+.tag.jade { font-weight: 600; }
+.tag.jade.fresh { color: #52713a; border-color: #bcd0ab; background: #e9f0e2; }
+.tag.jade.stale { color: #9c6f10; border-color: #e3c98a; background: #fdf3d9; }
+.tag.jade.none { color: var(--muted); border-color: #e2d5b8; background: var(--panel2); }
+.stat .jade-fresh-count b { color: var(--ok); }
+.stat .jade-stale-count b { color: var(--warn); }
+
+/* 关闭「显示协战」时：卡片不带协战色条，改成中性边 */
+.card.run-off { border-left-color: #cdbb9a; background: var(--panel); }
+.card.run-off .char { color: var(--text); }
+
+/* ---------- 多选删除 ---------- */
+.select-bar {
+  display: none;
+  align-items: center; gap: 10px;
+  background: var(--accent-soft); border: 1px solid var(--accent);
+  border-radius: 8px; padding: 7px 13px; margin-bottom: 10px;
+  font-size: 13px;
+}
+.select-bar #select-count { font-weight: 600; color: var(--accent2); }
+.card.selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent), 0 2px 8px rgba(173, 125, 36, .22);
+  background: var(--accent-soft);
+}
+#f-jade-row { margin-top: 2px; }
+
+#editor, #pastewrap {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+  padding: 14px; margin-bottom: 12px; display: none;
+  box-shadow: 0 1px 3px rgba(125, 90, 23, .08);
+}
+#editor.on, #pastewrap.on { display: block; }
+#editor h2, #pastewrap h2 { font-size: 14px; margin: 0 0 10px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.grid2 label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.grid2 input, .grid2 select { width: 100%; }
+.editor-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+#pastewrap textarea {
+  width: 100%; min-height: 120px;
+  font-family: Consolas, monospace; font-size: 12px; margin-top: 6px;
+}
+
+/* 共同值开关 */
+.checkline {
+  display: flex; align-items: center; gap: 8px;
+  margin: 10px 0 6px; font-size: 13px; cursor: pointer; user-select: none;
+}
+.checkline input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
+
+.shared-grid {
+  display: none;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px; padding: 10px;
+  border: 1px dashed var(--line); border-radius: 8px; background: var(--panel2);
+  margin-bottom: 6px;
+}
+.shared-grid.on { display: grid; }
+.shared-grid label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; color: var(--muted);
+}
+.shared-grid input, .shared-grid select { width: 100%; }
+
+#paste-preview {
+  margin-top: 8px; white-space: pre-wrap;
+  font-family: Consolas, monospace; font-size: 12px;
+  max-height: 160px; overflow: auto;
+}
+#paste-preview table { border-collapse: collapse; font-size: 12px; }
+#paste-preview th, #paste-preview td {
+  border: 1px solid var(--line); padding: 2px 8px; text-align: left;
+}
+#paste-preview th { background: var(--panel2); color: var(--muted); font-weight: 600; }
+
+/* ---------- 导出 JSON 弹窗 ---------- */
+.modal-mask {
+  display: none;
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(74, 53, 32, .45);
+  align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal-mask.on { display: flex; }
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(74, 53, 32, .28);
+  width: min(880px, 100%);
+  max-height: 90vh;
+  display: flex; flex-direction: column;
+  padding: 16px 18px;
+}
+.modal h2 { font-size: 15px; margin: 0 0 8px; }
+.export-opts {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin: 10px 0 8px;
+}
+.export-opts .spacer { flex: 1 1 auto; }
+
+#export-text {
+  flex: 1 1 auto;
+  min-height: 300px;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow: auto;
+  resize: vertical;
+  background: #fffdf6;
+}
+#export-note { margin-top: 8px; color: var(--warn); }
+
+/* 后端版本过旧提示条 */
+.stale-banner {
+  background: #f9e4de;
+  border-bottom: 1px solid #e0b0a4;
+  color: var(--bad);
+  padding: 10px 20px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.stale-banner b { display: block; font-size: 14px; margin-bottom: 2px; }
+.stale-banner span { display: block; color: #9c4630; }
+
+/* 局域网目标的额外警告 */
+.warnbar.network {
+  background: #f9e4de;
+  border-color: #e0b0a4;
+  color: var(--bad);
+}
+
+/* ---------- 切换目标（根目录预设） ---------- */
+.roots-list {
+  display: flex; flex-direction: column; gap: 6px;
+  margin: 10px 0; max-height: 260px; overflow: auto;
+}
+.root-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 10px; align-items: center;
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 11px; background: var(--panel);
+}
+.root-item.current {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.root-item .info { min-width: 0; }
+.root-item .name { font-weight: 600; }
+.root-item .path {
+  font-family: Consolas, monospace; font-size: 11px;
+  color: var(--muted); word-break: break-all;
+}
+.root-item.unreachable { border-style: dashed; opacity: .8; }
+.root-item .tag { flex: 0 0 auto; }
+
+.roots-add {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px; align-items: end;
+  padding: 11px;
+  border: 1px dashed var(--line); border-radius: 8px;
+  background: var(--panel2);
+}
+.roots-add label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; color: var(--muted);
+}
+.roots-add input { width: 100%; }
+.roots-add button { grid-column: 1 / -1; justify-self: start; }
+
+footer {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  background: var(--panel); border-top: 1px solid var(--line);
+  padding: 10px 20px; display: flex; gap: 10px; align-items: center;
+}
+footer .status { flex: 1 1 auto; font-size: 13px; color: var(--muted); word-break: break-all; }
+footer .status.error { color: var(--danger); }
+footer .status.ok { color: var(--ok); }
+
+#toast {
+  position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%);
+  background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+  padding: 9px 17px; border-radius: 8px;
+  font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s;
+  max-width: 80vw; z-index: 30;
+  box-shadow: 0 4px 14px rgba(74, 53, 32, .18);
+}
+#toast.show { opacity: 1; }
+#toast.error { border-color: var(--bad); color: var(--bad); background: #f9e4de; }
+
+@media (max-width: 680px) {
+  .card { grid-template-columns: 26px 28px 1fr; }
+  .card .actions { grid-column: 1 / -1; justify-content: flex-end; }
+}

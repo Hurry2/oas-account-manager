@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OAS 账号列表管理</title>
+<!-- 图标与 xianyu 账号管理同款：米黄底 + 金棕描边 -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23f6ecd8'/%3E%3Crect x='5' y='5' width='54' height='54' rx='9' fill='none' stroke='%23c9a75f' stroke-width='2'/%3E%3Crect x='12' y='12' width='20' height='6' rx='3' fill='%23b8862e'/%3E%3Crect x='35' y='12' width='17' height='6' rx='3' fill='%23f1e3c6'/%3E%3Crect x='12' y='23' width='40' height='4' rx='2' fill='%23c9a75f'/%3E%3Crect x='12' y='31' width='40' height='4' rx='2' fill='%23e2cfa5'/%3E%3Crect x='12' y='39' width='40' height='4' rx='2' fill='%23e2cfa5'/%3E%3Crect x='12' y='47' width='19' height='7' rx='3' fill='%23f1e3c6'/%3E%3Crect x='34' y='47' width='18' height='7' rx='3' fill='%23b8862e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<header>
+  <h1>账号列表管理</h1>
+  <label class="field">配置
+    <select id="config-select"></select>
+  </label>
+  <label class="field">列表
+    <select id="target-select"></select>
+  </label>
+  <button id="btn-reload" title="丢弃未保存的修改，重新从磁盘读取">重新加载</button>
+  <label class="field">排序方式
+    <select id="sort-mode">
+      <option value="id">账号 → 系统 → 编号</option>
+      <option value="account">账号 → 系统 → 角色名</option>
+    </select>
+  </label>
+  <label class="field" id="platform-order-field">系统优先
+    <select id="platform-order">
+      <option value="android">安卓在前</option>
+      <option value="ios">iOS 在前</option>
+    </select>
+  </label>
+  <button id="btn-sort" title="按当前排序方式重新排序">自动排序</button>
+  <div class="view-toggle" id="view-toggle" role="group">
+    <button id="btn-view-list" title="竖排列表：信息全，卡片间可插入">☰ 列表</button>
+    <button id="btn-view-grid" title="方块网格：紧凑，从左到右从上到下">▦ 方块</button>
+  </div>
+  <label class="field" id="grid-cols-field" title="方块视图每行放几张卡。账号一般 4 个一组，固定 4 列正好一组占满一行">
+    每行
+    <select id="grid-cols">
+      <option value="auto">自动</option>
+      <option value="2">2 张</option>
+      <option value="3">3 张</option>
+      <option value="4">4 张</option>
+      <option value="6">6 张</option>
+      <option value="8">8 张</option>
+    </select>
+  </label>
+  <button id="btn-export" title="导出该任务的完整 JSON（不脱敏，可直接复制）">导出 JSON</button>
+  <button id="btn-roots" title="切换目标 OAS 目录（支持局域网路径）">切换目标</button>
+  <label class="field" id="run-filter-field">运行状态
+    <select id="run-filter">
+      <option value="all">全部</option>
+      <option value="today">今天已执行</option>
+      <option value="stale">今天未执行</option>
+      <option value="never">从未执行</option>
+    </select>
+  </label>
+  <label class="field checkline" id="battle-toggle-field" title="关闭后不显示协战状态（适合只执行勾协的配置）">
+    <input type="checkbox" id="battle-toggle" checked>
+    <span>显示协战</span>
+  </label>
+  <label class="field checkline" id="jade-toggle-field" style="display:none">
+    <input type="checkbox" id="jade-toggle">
+    <span>显示勾协</span>
+  </label>
+  <label class="field" id="jade-filter-field">勾协类型
+    <select id="jade-filter">
+      <option value="all">全部</option>
+      <option value="无勾">无勾</option>
+      <option value="普勾">普勾</option>
+      <option value="现勾">现勾</option>
+      <option value="stale">勾协已过期</option>
+      <option value="none">从未查找</option>
+    </select>
+  </label>
+</header>
+
+<main>
+  <div class="warnbar" id="target-bar">
+    保存会直接改写 <code>config/{配置}.json</code>（写前自动备份到工具目录的 backups/）。<b>OAS 实例运行中时请先停止实例</b>，
+    否则脚本进程回写配置会覆盖本次修改。
+  </div>
+  <div class="warnbar network" id="network-warn" style="display:none">
+    ⚠ 目标在<b>局域网</b>上：保存前请确认<b>那台机器上的 OAS 实例已停止</b>，
+    否则它的回写会覆盖你的修改（可能没有任何提示）。
+  </div>
+
+  <div class="toolbar">
+    <button id="btn-add">＋ 在末尾添加</button>
+    <button id="btn-paste">批量粘贴导入</button>
+    <div class="spacer"></div>
+    <span class="hint">点卡片选中（Shift 连选）· 点 ✎ 编辑 · 拖动 ⠿ 排序</span>
+  </div>
+  <div class="select-bar" id="select-bar" style="display:none">
+    <span id="select-count">已选 0 个账号</span>
+    <button id="btn-select-all">全选</button>
+    <button id="btn-delete-selected" class="danger">删除选中</button>
+    <button id="btn-select-clear">取消选择</button>
+    <span class="spacer"></span>
+    <span id="batch-jade-wrap" style="display:none">
+      <button id="btn-batch-jade-now" type="button" title="勾协时间设为当前时间，本刷新周期内这些账号会被跳过">勾协：标记已发现</button>
+      <button id="btn-batch-jade-never" type="button" title="勾协时间重置为默认值、状态归位 none，下个周期会重新查找">勾协：标记未发现</button>
+    </span>
+  </div>
+  <!-- 切号执行任务特有：轮换指针（脚本自动维护，这里只读展示） -->
+  <div class="taskinfo" id="task-info" style="display:none"></div>
+  <div class="stat" id="stat"></div>
+
+  <div id="editor">
+    <h2 id="editor-title">编辑账号</h2>
+    <div class="grid2">
+      <label>角色名 character<input id="f-character" type="text"></label>
+      <label>服务器 svr<input id="f-svr" type="text"></label>
+      <label>账号 account<input id="f-account" type="text"></label>
+      <label>账号别名 account_alias（<code>#</code> 分隔）<input id="f-alias" type="text"></label>
+      <label>平台<select id="f-platform"><option value="android">安卓</option><option value="ios">iOS</option></select></label>
+      <label>上次完成时间 last_complete_time
+        <input id="f-time" type="text" placeholder="2023-01-01 00:00:00">
+      </label>
+      <div id="f-jade-row" class="grid2" style="grid-column: 1 / -1; display:none">
+        <label>勾协状态 jade_status
+          <select id="f-jade-status">
+            <option value="none">none（从未查找）</option>
+            <option value="无勾">无勾</option>
+            <option value="普勾">普勾</option>
+            <option value="现勾">现勾</option>
+          </select>
+        </label>
+        <label>勾协发现时间 jade_complete_time
+          <input id="f-jade-time" type="text" placeholder="2023-01-01 00:00:00">
+        </label>
+      </div>
+    </div>
+    <div class="editor-actions" style="margin-top:8px">
+      <button id="btn-time-now" type="button" title="协战时间设为当前时间，相当于标记「今天已执行」">协战：标记已执行</button>
+      <button id="btn-time-never" type="button" title="协战时间重置为默认值，相当于「从未执行」">协战：标记未执行</button>
+      <span id="btn-jade-now-wrap">
+        <button id="btn-jade-now" type="button" title="勾协时间设为当前时间，本刷新周期（5:00/18:00）内会被跳过">勾协：标记已发现</button>
+      </span>
+      <span id="btn-jade-never-wrap">
+        <button id="btn-jade-never" type="button" title="勾协时间重置为默认值、状态归位 none，下个周期会重新查找">勾协：标记未发现</button>
+      </span>
+    </div>
+    <div class="hint" style="margin-top:6px">
+      last_complete_time 由协战脚本在完成时写入，用于判断「今天是否已完成」。
+      手工改成今天的时间会让该账号今天被跳过（<code>skip_completed_account_enable</code> 开启时）。
+      勾协字段只在「一键协战」列表出现，按 5:00 / 18:00 刷新。
+    </div>
+    <div class="editor-actions">
+      <button class="primary" id="btn-editor-ok">确定（Enter）</button>
+      <button id="btn-editor-cancel">取消（Esc）</button>
+    </div>
+  </div>
+
+  <div id="pastewrap">
+    <h2>批量粘贴导入（追加到当前列表末尾）</h2>
+    <div class="hint">
+      每行一个账号，<b>Tab 或逗号</b>分隔。可直接从 Excel 复制，<b>列顺序自动识别</b>：
+      <br>· <code>平台, 账号, 服务器, 角色名</code> —— 如 <code>iOS&#9;i154&#9;雅乐之邦&#9;紫星一号</code>
+      <br>· <code>账号, 服务器, 角色名</code> —— 如 <code>i154&#9;雅乐之邦&#9;紫星一号</code>（与上一种同顺序，省略平台）
+      <br>账号格里可以用逗号挂别名：<code>i154,别名1,别名2</code> —— 第一个是账号，其余都是别名
+      <br>也支持 JSON 数组。<b>角色名为空的行会被跳过。</b>
+    </div>
+
+    <label class="checkline">
+      <input type="checkbox" id="paste-shared-enable">
+      <span><b>使用共同值</b>：同一批账号的账号/服务器/平台只填一次，行里留空就行</span>
+    </label>
+
+    <div id="paste-shared" class="shared-grid">
+      <label>共同账号 account<input id="shared-account" type="text" placeholder="i154"></label>
+      <label>共同服务器 svr<input id="shared-svr" type="text" placeholder="雅乐之邦"></label>
+      <label>共同系统
+        <select id="shared-platform">
+          <option value="">（不指定，默认安卓）</option>
+          <option value="android">安卓</option>
+          <option value="ios">iOS</option>
+        </select>
+      </label>
+      <label>共同别名 account_alias<input id="shared-alias" type="text" placeholder="可留空"></label>
+    </div>
+
+    <textarea id="paste-text" placeholder="iOS&#9;i154&#9;雅乐之邦&#9;紫星一号&#10;iOS&#9;i154&#9;花火之夏&#9;紫星二号"></textarea>
+    <div class="editor-actions">
+      <button class="primary" id="btn-paste-ok">导入</button>
+      <button id="btn-paste-cancel">取消</button>
+      <button id="btn-paste-preview" type="button">预览识别结果</button>
+    </div>
+    <div id="paste-preview" class="hint"></div>
+  </div>
+
+  <div id="list"></div>
+</main>
+
+<div id="exportmodal" class="modal-mask">
+  <div class="modal">
+    <h2>导出 JSON（未脱敏）</h2>
+    <div class="hint" id="export-info"></div>
+    <div class="export-opts">
+      <label class="checkline" style="margin:0">
+        <input type="checkbox" id="export-dirty" checked>
+        <span>包含未保存的修改（当前页面上的列表）</span>
+      </label>
+      <span class="spacer"></span>
+      <button id="btn-export-copy" class="primary">复制到剪贴板</button>
+      <button id="btn-export-download">下载文件</button>
+      <button id="btn-export-close">关闭</button>
+    </div>
+    <textarea id="export-text" spellcheck="false" readonly></textarea>
+    <div class="hint" id="export-note">
+      这份 JSON 含完整账号信息（未脱敏），粘贴或分享时请注意。
+      格式与 OAS 的「配置 → 导出任务」一致，可直接用于导入。
+    </div>
+  </div>
+</div>
+
+<div id="rootsmodal" class="modal-mask">
+  <div class="modal" style="width:min(720px,100%)">
+    <h2>切换目标 OAS 目录</h2>
+    <div class="hint">
+      当前：<code id="roots-current"></code>
+      <br>选择已有的目录，或输入新路径（支持网络路径，如
+      <code>\\oas\OnmyojiAutoScript-easy-install</code>）。路径下面必须有 <code>config</code> 目录。
+    </div>
+
+    <div id="roots-list" class="roots-list"></div>
+
+    <div class="roots-add">
+      <label>名称（可留空）<input id="roots-name" type="text" placeholder="例如：局域网 OAS"></label>
+      <label>路径<input id="roots-path" type="text" placeholder="\\oas\OnmyojiAutoScript-easy-install"></label>
+      <button id="btn-roots-use" class="primary">切换到这个路径</button>
+      <button id="btn-roots-add">仅保存为预设</button>
+    </div>
+
+    <div class="editor-actions" style="justify-content:flex-end">
+      <button id="btn-roots-close">关闭</button>
+    </div>
+    <div class="hint" id="roots-note" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<footer>
+  <div class="status" id="status">就绪</div>
+  <button id="btn-discard" disabled>放弃修改</button>
+  <button class="primary" id="btn-save" disabled>保存</button>
+  <button id="btn-quit" class="danger" title="停止工具进程并关闭服务">退出工具</button>
+</footer>
+<div id="toast"></div>
+
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
