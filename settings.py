@@ -132,17 +132,98 @@ def default_root() -> str | None:
     return None
 
 
-def root_reachable(path: str) -> bool:
-    """路径下有没有 config 目录（网络路径也能判断）"""
-    if not str(path or '').strip():
-        return False
-    try:
-        return (Path(path) / 'config').is_dir()
-    except OSError:
-        return False
+def _call_with_timeout(fn, timeout: float, default=None):
+    """在守护线程里跑 fn，最多等 timeout 秒；超时返回 default。
+
+    为什么必须这样：UNC 路径上的 socket 连接和 Path.is_dir() 都**无法靠
+    timeout 参数限时**——
+      * socket.create_connection 的 timeout 不覆盖 getaddrinfo（DNS 解析会挂）
+      * Path.is_dir() 遇到不可达共享会挂满 SMB 超时（实测 >2 分钟）
+    所以只能用线程 + join(timeout) 硬卡上限。卡住的线程是 daemon，
+    不会阻止进程退出。
+    """
+    import threading
+
+    box = {}
+
+    def worker():
+        try:
+            box['value'] = fn()
+        except Exception:
+            box['value'] = default
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    thread.join(timeout)
+    if thread.is_alive():
+        return default
+    return box.get('value', default)
 
 
 def is_network_path(path: str) -> bool:
     """是不是 UNC 网络路径（\\\\\\\\server\\\\share）"""
     text = str(path or '')
     return text.startswith('\\\\') or text.startswith('//')
+
+
+def _unc_host(path: str) -> str:
+    """从 UNC 路径里取出主机名；不是 UNC 就返回空串
+
+    \\\\oas\\share\\sub  ->  'oas'
+    //oas/share        ->  'oas'
+    """
+    text = str(path or '').strip()
+    if not is_network_path(text):
+        return ''
+    rest = text.lstrip('\\/')
+    host = rest.split('\\', 1)[0].split('/', 1)[0]
+    return host.strip()
+
+
+def network_host_alive(path: str, timeout: float = 1.5) -> bool:
+    """快速判断 UNC 路径所在主机是否在线。
+
+    为什么需要这个：目标机器**不在线**时 Path(...).is_dir() 不会立刻返回 False，
+    而是等满 SMB 超时（实测本机超过 2 分钟）。启动流程里只要有一个
+    不可达的网络预设，整个工具就"双击没反应"。
+    这里用线程硬超时把判断压到 1.5 秒内。
+    """
+    host = _unc_host(path)
+    if not host:
+        return True  # 本地路径不需要探测
+
+    import socket
+
+    def probe() -> bool:
+        for port in (445, 139):
+            try:
+                with socket.create_connection((host, port), timeout=timeout):
+                    return True
+            except OSError:
+                continue
+        return False
+
+    return bool(_call_with_timeout(probe, timeout, default=False))
+
+
+def root_reachable(path: str) -> bool:
+    """路径下有没有 config 目录（网络路径也能判断）
+
+    网络路径的整个检查都套了硬超时：主机不在线或共享无响应时
+    立刻返回 False，不会让 is_dir() 挂满 SMB 超时导致启动卡死。
+    """
+    if not str(path or '').strip():
+        return False
+
+    def check() -> bool:
+        try:
+            return (Path(path) / 'config').is_dir()
+        except OSError:
+            return False
+
+    if is_network_path(path):
+        # 先花最多 1.5 秒探端口，不通就别再碰共享
+        if not network_host_alive(path):
+            return False
+        return bool(_call_with_timeout(check, 3.0, default=False))
+    return check()

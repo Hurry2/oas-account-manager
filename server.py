@@ -1410,23 +1410,38 @@ def _as_root_path(text: str | None) -> Path | None:
     """把用户给的路径规范化成"含 config/ 的 OAS 根目录"。
 
     接受：OAS 根目录本身、或直接指向 config 目录。
-    网络路径（\\\\server\\share）也能处理。
+    网络路径（\\\\server\\share）也能处理，但**不可达时会立刻返回 None**，
+    不会让 is_dir() 挂满 SMB 超时（那会让双击启动看起来毫无反应）。
     """
     if not text:
         return None
     raw = str(text).strip().strip('"').strip("'")
     if not raw:
         return None
-    given = Path(raw).expanduser()
+    # 网络路径先探端口：主机不在线就没必要往下走
+    if _settings.is_network_path(raw) and not _settings.network_host_alive(raw):
+        print('网络路径不可达（已跳过）: %s' % raw)
+        return None
+
+    def resolve_root() -> Path | None:
+        given = Path(raw).expanduser()
+        try:
+            given = given.resolve()
+        except OSError:
+            given = Path(raw)
+        if given.name == 'config' and given.is_dir():
+            return given.parent
+        if (given / 'config').is_dir():
+            return given
+        return None
+
+    # 网络路径的 resolve()/is_dir() 都可能挂满 SMB 超时，套硬超时
+    if _settings.is_network_path(raw):
+        return _settings._call_with_timeout(resolve_root, 5.0, default=None)
     try:
-        given = given.resolve()
+        return resolve_root()
     except OSError:
-        given = Path(raw)
-    if given.name == 'config' and given.is_dir():
-        return given.parent
-    if (given / 'config').is_dir():
-        return given
-    return None
+        return None
 
 
 def detect_repo_root(explicit: str | None = None) -> Path | None:
@@ -1459,10 +1474,21 @@ def detect_repo_root(explicit: str | None = None) -> Path | None:
         if found is not None:
             return found
 
-    # 预设路径（支持网络路径）
+    # 预设路径（支持网络路径）。
+    # 默认预设不可达时（典型情况：局域网那台机器关机了）不能直接放弃，
+    # 继续尝试其它预设 —— 否则本地那份明明能用，双击却报"找不到 config"。
     preset = _as_root_path(_settings.default_root())
     if preset is not None:
         return preset
+
+    for item in _settings.load_settings().get('roots', []):
+        path = str(item.get('path') or '').strip()
+        if not path:
+            continue
+        found = _as_root_path(path)
+        if found is not None:
+            print('默认预设不可用，改用预设「%s」: %s' % (item.get('name', ''), found))
+            return found
 
     here = Path(__file__).resolve().parent
     found = search_up(here)
