@@ -225,11 +225,22 @@ class Store:
     READ_RETRY_DELAY = 0.05
 
     def _read_json(self, path: Path) -> dict:
-        """读 JSON，遇到半写文件时短暂重试；仍失败才抛错"""
+        """读 JSON，遇到半写文件时短暂重试；仍失败才抛错
+
+        两类失败要分开报：
+          * 权限不足（PermissionError / EACCES）：重试没用，是共享端权限问题。
+            典型场景：Linux/Samba 共享上的文件是 600，Samba 以别的身份访问。
+          * 半写/网络抖动：重试有用。
+        以前一律报"可能正被其他进程写入"，遇到权限问题时用户会一直点重试，
+        永远好不了，也很难想到去看共享端的文件权限。
+        """
         last_error = None
         for attempt in range(self.READ_RETRIES):
             try:
                 return json.loads(path.read_text(encoding='utf-8'))
+            except PermissionError as error:
+                # 权限问题重试无意义，直接给可操作的提示
+                raise ValueError(self._permission_hint(path, error)) from error
             except (ValueError, OSError) as error:
                 # ValueError: JSON 半截 / UnicodeDecodeError 的父类
                 # OSError: 文件正被独占或网络抖动
@@ -240,6 +251,39 @@ class Store:
             f'配置文件暂时读不出来（可能正被其他进程写入）：{path.name}；'
             f'请稍后再点一次「重新加载」。原始错误：{last_error}'
         )
+
+    @staticmethod
+    def _permission_hint(path: Path, error: Exception) -> str:
+        """权限不足时的提示：说清是什么问题、在哪台机器上改"""
+        hint = (
+            f'没有权限读取配置：{path.name}\n'
+            f'路径：{path}\n'
+            f'原始错误：{error}\n'
+        )
+        if _settings.is_network_path(str(path)):
+            hint += (
+                '\n这是网络共享（Samba/SMB）上的文件。常见原因：\n'
+                '  · 共享端文件的权限位不允许 Samba 用户读取（例如 600）\n'
+                '  · 文件属主和 Samba 运行用户不是同一个\n'
+                '\n⚠ 注意：临时 chmod 644 会被反复覆盖。OAS 保存配置时走\n'
+                '  tempfile.mkstemp()（固定创建 0600）+ rename 覆盖，\n'
+                '  所以它每写一次，权限就被重置回 600。\n'
+                '\n持久修法（在共享端那台机器上，二选一）：\n'
+                '  A) 让 Samba 以 OAS 的属主身份访问（推荐）——\n'
+                '     在 smb.conf 的该共享段里加：force user = <OAS运行用户>\n'
+                '  B) 改 OAS 的写入方式，让临时文件创建后 chmod 0644\n'
+                '\n先用这两条确认现状：\n'
+                '  ps -eo user,pid,cmd | grep -i "script.py\\|gui.py" | grep -v grep\n'
+                '  ls -l <config 目录>/*.json\n'
+                '\n注意：改配置前请先停掉共享端正在运行的 OAS，'
+                '否则它可能把你的修改回写覆盖。'
+            )
+        else:
+            hint += (
+                '\n本机文件权限不足。请检查该文件是否被其它程序独占，'
+                '或右键属性 → 安全 里给当前用户读取权限。'
+            )
+        return hint
 
     def read_target(self, name: str, target: str) -> dict:
         if target not in TARGETS:
@@ -447,14 +491,44 @@ class Store:
     @staticmethod
     def _atomic_write(path: Path, data: dict) -> None:
         text = json.dumps(data, indent=2, ensure_ascii=False, sort_keys=False, default=str)
-        fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix='.acct-', suffix='.tmp')
+        try:
+            fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix='.acct-', suffix='.tmp')
+        except PermissionError as error:
+            raise ValueError(Store._write_permission_hint(path, error)) from error
         try:
             with os.fdopen(fd, 'w', encoding='utf-8', newline='') as handle:
                 handle.write(text)
             os.replace(tmp_name, path)
+        except PermissionError as error:
+            Path(tmp_name).unlink(missing_ok=True)
+            raise ValueError(Store._write_permission_hint(path, error)) from error
         except BaseException:
             Path(tmp_name).unlink(missing_ok=True)
             raise
+
+    @staticmethod
+    def _write_permission_hint(path: Path, error: Exception) -> str:
+        """写入权限不足时的提示（网络共享场景给出可操作步骤）"""
+        hint = (
+            f'没有权限写入配置：{path.name}\n'
+            f'路径：{path}\n'
+            f'原始错误：{error}\n'
+        )
+        if _settings.is_network_path(str(path)):
+            hint += (
+                '\n这是网络共享（Samba/SMB）上的文件，共享端不允许当前用户写入。\n'
+                '\n⚠ 注意：临时 chmod 会被反复覆盖——OAS 保存配置时走\n'
+                '  tempfile.mkstemp()（固定 0600）+ rename 覆盖，\n'
+                '  每写一次权限就重置回 600。\n'
+                '\n持久修法（在共享端那台机器上，二选一）：\n'
+                '  A) 在 smb.conf 的该共享段里加：force user = <OAS运行用户>\n'
+                '  B) 改 OAS 的写入方式，让临时文件创建后 chmod 0644\n'
+                '\n另外：如果共享端 OAS 正在运行，它可能在你写入后立刻回写覆盖，'
+                '请先停掉再改。'
+            )
+        else:
+            hint += '\n请检查文件是否只读，或当前用户对该目录是否有写权限。'
+        return hint
 
 
 # --------------------------------------------------------------------------- HTTP
