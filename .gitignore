@@ -21,4 +21,7 @@ __pycache__/
 .idea/
 Thumbs.db
 desktop.ini
+
+# 一般忽略快捷方式（各机器自己建），但仓库自带的启动器要进版本库
 *.lnk
+!启动账号管理（独立窗口）.lnk
