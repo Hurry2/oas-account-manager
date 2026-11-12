@@ -1,8 +1,8 @@
-/* 主题一致性自检：ui.css 的配色必须与 E:\git_src\xianyu\account-manager 同一套。
+/* 主题一致性自检：ui.css 的配色必须与既定的暖色主题同一套。
  * 用法：node check-theme.js
  *
- * 背景（2026-11-01）：用户要求"参考 xianyu 那边的风格统一一下前端 UI"。
- * xianyu 的两个页面（web_ui.html / service_ui.html）用的是
+ * 背景（2026-11-01）：用户要求统一前端 UI 风格。
+ * 参考页面的配色方案用的是
  * **米黄羊皮纸底 + 金棕主色**，本工具原来是冷灰蓝（#f5f6f8 / #2f6fed）。
  * 这里把关键色值钉死，避免以后又被改回冷色系。
  *
@@ -25,7 +25,7 @@ function check(name, ok, detail) {
 }
 
 // ---------------------------------------------------------------- 主题变量
-// 与 xianyu/account-manager/web_ui.html 的 :root 逐项对齐
+// 与参考页面的 :root 逐项对齐
 const EXPECTED = {
   '--bg': '#efdfc0',
   '--panel': '#fdf8ec',
@@ -40,7 +40,7 @@ const EXPECTED = {
   '--warn': '#bf8a20',
 };
 
-console.log('主题变量（与 xianyu 对齐）:');
+console.log('主题变量（与参考主题对齐）:');
 Object.keys(EXPECTED).forEach((name) => {
   const re = new RegExp(name.replace(/-/g, '\\-') + ':\\s*([^;]+);');
   const m = re.exec(css);
@@ -70,14 +70,14 @@ OLD_COLORS.forEach((color) => {
 });
 
 // ---------------------------------------------------------------- 结构风格
-// xianyu 的几处标志性样式，保持一致
-console.log('结构风格（xianyu 同款）:');
+// 参考主题的几处标志性样式，保持一致
+console.log('结构风格:');
 {
   check('body 字体用 Segoe UI 打头', /font:[^;]*"Segoe UI"/.test(css));
   check('按钮圆角 7px', /button\s*\{[^}]*border-radius:\s*7px/.test(css));
   check('输入控件圆角 6px', /border-radius:\s*6px/.test(css));
   check('卡片圆角 10px', /\.card\s*\{[^}]*border-radius:\s*10px/.test(css));
-  check('标签圆角 9px（xianyu 的 .tag）', /\.tag\s*\{[^}]*border-radius:\s*9px/.test(css));
+  check('标签圆角 9px（.tag）', /\.tag\s*\{[^}]*border-radius:\s*9px/.test(css));
   check('卡片有柔和阴影（暖棕调）',
     /box-shadow:\s*0 1px 3px rgba\(125, 90, 23/.test(css));
   check('焦点态用金棕描边 + 半透明光晕',
@@ -93,7 +93,7 @@ console.log('结构风格（xianyu 同款）:');
 // ---------------------------------------------------------------- 页面骨架
 console.log('页面骨架:');
 {
-  check('ui.html 有与 xianyu 同款的 favicon',
+  check('ui.html 有 favicon',
     /rel="icon"[^>]*image\/svg\+xml/.test(html));
   check('favicon 用米黄底（%23f6ecd8）', html.indexOf('%23f6ecd8') >= 0);
   check('引入了 ui.css', /href="ui.css"/.test(html));

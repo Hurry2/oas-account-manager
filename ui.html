@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OAS 账号列表管理</title>
-<!-- 图标与 xianyu 账号管理同款：米黄底 + 金棕描边 -->
+<!-- 图标遵循既定暖色主题：米黄底 + 金棕描边 -->
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23f6ecd8'/%3E%3Crect x='5' y='5' width='54' height='54' rx='9' fill='none' stroke='%23c9a75f' stroke-width='2'/%3E%3Crect x='12' y='12' width='20' height='6' rx='3' fill='%23b8862e'/%3E%3Crect x='35' y='12' width='17' height='6' rx='3' fill='%23f1e3c6'/%3E%3Crect x='12' y='23' width='40' height='4' rx='2' fill='%23c9a75f'/%3E%3Crect x='12' y='31' width='40' height='4' rx='2' fill='%23e2cfa5'/%3E%3Crect x='12' y='39' width='40' height='4' rx='2' fill='%23e2cfa5'/%3E%3Crect x='12' y='47' width='19' height='7' rx='3' fill='%23f1e3c6'/%3E%3Crect x='34' y='47' width='18' height='7' rx='3' fill='%23b8862e'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="ui.css">
 </head>
@@ -221,14 +221,14 @@
     <div class="hint">
       当前：<code id="roots-current"></code>
       <br>选择已有的目录，或输入新路径（支持网络路径，如
-      <code>\\oas\OnmyojiAutoScript-easy-install</code>）。路径下面必须有 <code>config</code> 目录。
+      <code>\\主机名\共享名</code>）。路径下面必须有 <code>config</code> 目录。
     </div>
 
     <div id="roots-list" class="roots-list"></div>
 
     <div class="roots-add">
       <label>名称（可留空）<input id="roots-name" type="text" placeholder="例如：局域网 OAS"></label>
-      <label>路径<input id="roots-path" type="text" placeholder="\\oas\OnmyojiAutoScript-easy-install"></label>
+      <label>路径<input id="roots-path" type="text" placeholder="\\主机名\共享名"></label>
       <button id="btn-roots-use" class="primary">切换到这个路径</button>
       <button id="btn-roots-add">仅保存为预设</button>
     </div>

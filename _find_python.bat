@@ -51,7 +51,10 @@ if /i "%WANT%"=="pythonw" (
 
 rem --- 4) walk up looking for toolkit\<name>.exe ----------------------------
 set "DIR=%~dp0"
+set /a WALK=0
 :walk
+set /a WALK+=1
+if %WALK% GTR 32 goto walk_done
 if exist "%DIR%toolkit\%WANT%.exe" (
     endlocal&set "%VARN%=%DIR%toolkit\%WANT%.exe"&exit /b 0
 )
@@ -62,14 +65,36 @@ if /i "%WANT%"=="pythonw" (
     )
 )
 for %%I in ("%DIR%..") do set "PARENT=%%~fI"
+rem Stop when we cannot go any higher.
+rem "%%~fI" keeps a trailing backslash for a drive root ("X:\"), so the
+rem naive "PARENT == DIR" test never fires: DIR "X:\a\" -> PARENT "X:\"
+rem -> next DIR becomes "X:\\" and the loop spins forever. That is exactly
+rem what happened once this tool lived outside the OAS tree (no toolkit\
+rem ancestor to hit early). Strip the trailing slash and compare "X:".
 if /i "%PARENT%"=="%DIR%" goto walk_done
-if not exist "%DIR%.." goto walk_done
+set "P2=%PARENT%"
+if "%P2:~-1%"=="\" set "P2=%P2:~0,-1%"
+if "%P2:~1%"==":" goto walk_done
 set "DIR=%PARENT%\"
 goto walk
 :walk_done
 
 rem --- 5) PATH --------------------------------------------------------------
-if /i "%WANT%"=="python" (
+rem pythonw: prefer pythonw.exe (no console window). If the system only has
+rem python.exe, fall back to it -- the launcher still works, a console may
+rem flash briefly. Without this fallback, a machine that installed Python
+rem with the default options (python.exe only) could never start the tool.
+if /i "%WANT%"=="pythonw" (
+    for %%I in (pythonw.exe) do if not "%%~$PATH:I"=="" (
+        endlocal&set "%VARN%=%%~$PATH:I"&exit /b 0
+    )
+    for %%I in (python.exe) do if not "%%~$PATH:I"=="" (
+        endlocal&set "%VARN%=%%~$PATH:I"&exit /b 0
+    )
+    for %%I in (pyw.exe) do if not "%%~$PATH:I"=="" (
+        endlocal&set "%VARN%=%%~$PATH:I"&exit /b 0
+    )
+) else (
     for %%I in (python.exe) do if not "%%~$PATH:I"=="" (
         endlocal&set "%VARN%=%%~$PATH:I"&exit /b 0
     )

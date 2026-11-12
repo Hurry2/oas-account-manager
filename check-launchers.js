@@ -5,9 +5,8 @@
  *  - .bat 必须是纯 ASCII：cmd.exe 按控制台代码页解析 .bat，
  *    UTF-8 中文会导致 "not recognized as an internal or external command"
  *  - .bat 引用的 python / server.py 路径按仓库结构能解析到
- *  - .ps1 必须是 UTF-8 with BOM：Windows PowerShell 5.1 无 BOM 时按 GBK 读，
- *    中文会乱码到语法报错
  *  - .vbs 引用的 .bat 存在
+ *  - 根目录 .lnk 指向 wscript + 本目录的 vbs（可移植，不写死解释器路径）
  */
 'use strict';
 
@@ -30,7 +29,6 @@ function readBytes(name) {
 console.log('批处理（必须纯 ASCII）:');
 for (const name of [
   '启动账号管理.bat',
-  '启动账号管理（无窗口）.bat',
   '启动账号管理（独立窗口）.bat',
   '关闭账号管理.bat',
 ]) {
@@ -65,29 +63,50 @@ console.log('关闭脚本:');
   check('ui.html 有退出按钮', /id="btn-quit"/.test(fs.readFileSync(path.join(dir, 'ui.html'), 'utf8')));
 }
 
-console.log('PowerShell（必须 UTF-8 BOM）:');
-{
-  const name = 'install-shortcut.ps1';
-  const buf = readBytes(name);
-  const hasBom = buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf;
-  check(name + ' 带 UTF-8 BOM', hasBom, hasBom ? '' : '无 BOM 时 PS 5.1 会按 GBK 读导致语法错误');
-  const text = buf.slice(3).toString('utf8');
-  check(name + ' 解析 pythonw.exe 路径', /toolkit\\\\?pythonw\.exe/.test(text) || /pythonw\.exe/.test(text));
-  check(name + ' 解析 server.py 路径', /server\.py/.test(text));
-  check(name + ' 支持 -TargetDir 测试参数', /\[string\]\$TargetDir/.test(text));
-  check(name + ' 创建 .lnk', /CreateShortcut/.test(text));
-}
-
 console.log('VBScript:');
 {
-  const text = readBytes('启动账号管理.vbs').toString('utf8');
-  check('调用无窗口 bat', text.includes('启动账号管理（无窗口）.bat'));
-  check('隐藏窗口运行', /shell\.Run/i.test(text) && /,\s*0\s*,/.test(text));
-}
-{
-  const text = readBytes('启动账号管理（独立窗口）.vbs').toString('utf8');
+  // VBScript 编码是个坑：WSH 按系统 ANSI 代码页（中文系统 = GBK）读**无 BOM**
+  // 的 .vbs。UTF-8 无 BOM 的中文会被当 GBK 解析成乱码，路径找不到，
+  // 双击后弹一个满屏乱码的错误框。必须存成 UTF-16LE + BOM（WSH 原生支持）
+  // 或 GBK；这里统一要求 UTF-16LE + BOM。
+  const name = '启动账号管理（独立窗口）.vbs';
+  const buf = readBytes(name);
+  const isUtf16 = buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe;
+  check(name + ' 是 UTF-16LE + BOM', isUtf16,
+    isUtf16 ? '' : 'WSH 会按 GBK 读无 BOM 的 UTF-8，中文路径变乱码');
+
+  const text = isUtf16 ? buf.slice(2).toString('utf16le') : buf.toString('utf8');
   check('独立窗口 vbs 调用独立窗口 bat', text.includes('启动账号管理（独立窗口）.bat'));
   check('独立窗口 vbs 隐藏窗口运行', /shell\.Run/i.test(text) && /,\s*0\s*,/.test(text));
+}
+
+console.log('根目录快捷方式（.lnk）:');
+{
+  // .lnk 是二进制，路径可能以 UTF-16 或相对链接结构存储，
+  // 这里不试图解析格式，只校验关键约束：
+  //   1) 文件存在
+  //   2) 目标进程是 wscript（而非写死 pythonw.exe）
+  //   3) 不含任何解释器 / 项目绝对路径（换机器才不失效）
+  //   4) 它调用的 vbs 确实存在
+  const name = '启动账号管理（独立窗口）.lnk';
+  const p = path.join(dir, name);
+  const exists = fs.existsSync(p);
+  check(name + ' 存在', exists);
+
+  if (exists) {
+    const buf = fs.readFileSync(p);
+    // 两种编码都拼上，.lnk 的字符串可能是 ASCII 也可能是 UTF-16LE
+    const all = buf.toString('latin1') + '\n' + buf.toString('utf16le');
+
+    check(name + ' 目标是 wscript', /wscript/i.test(all),
+      '应通过 vbs 启动，而不是直接指向 pythonw.exe');
+    check(name + ' 不写死解释器路径',
+      !/pythonw/i.test(all) && !/toolkit/i.test(all),
+      '含 pythonw/toolkit 说明写死了本机解释器，换机器会失效');
+
+    check(name + ' 对应的 vbs 存在',
+      fs.existsSync(path.join(dir, '启动账号管理（独立窗口）.vbs')));
+  }
 }
 
 console.log('独立窗口模式:');

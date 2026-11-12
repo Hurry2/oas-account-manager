@@ -1,0 +1,43 @@
+feat: 根目录 app 模式快捷方式 + 精简启动器 + 修复两处启动 bug
+
+## 启动入口调整
+
+- 新增根目录 `启动账号管理（独立窗口）.lnk`：双击即开独立应用窗口
+  （Chrome/Edge --app，无地址栏/标签栏），可直接发到桌面
+- .lnk 指向 `wscript.exe` + 同目录 .vbs，**不写死解释器路径**，
+  整目录拷到别的机器也能直接双击
+- 精简启动器：删除 `install-shortcut.ps1`、`启动账号管理（无窗口）.bat`、
+  `启动账号管理.vbs`；保留 app 模式（lnk/vbs/bat）、浏览器模式 bat、关闭脚本
+
+## 修复：_find_python.bat 向上搜索会死循环
+
+工具独立成库后（不在 OAS 目录树内，上方没有 toolkit\），`:walk` 循环
+会一直转到盘符根并卡死，导致双击毫无反应。
+
+根因：`for %%I in ("%DIR%..") do set "PARENT=%%~fI"` 对盘符根
+返回的是 `X:\`（带尾反斜杠），而 `DIR` 也是 `X:\`，于是
+`set "DIR=%PARENT%\"` 得到 `X:\\`，`PARENT == DIR` 永远不成立 → 死循环。
+
+修法：剥掉尾反斜杠后判断是否形如 `X:`，是则停止；另加 32 次上限兜底。
+
+## 修复：pythonw 在 PATH 分支找不到
+
+原来 PATH 分支只处理 `python`，`pythonw` 直接失败。默认安装的 Python
+通常只有 python.exe，导致 app 模式起不来。补上 pythonw → python →
+pyw 的降级链。
+
+## 修复：vbs 编码导致中文路径乱码
+
+vbs 是 UTF-8 无 BOM 存的，WSH 按系统 ANSI 代码页（中文 = GBK）解析，
+中文路径全变乱码，`FileExists` 找不到 bat，双击弹一个乱码错误框。
+改为 UTF-16LE + BOM（WSH 原生支持）。
+
+## 修复：关闭脚本 pause 让人以为卡住
+
+去掉结尾的 `pause`，关闭后直接退出。
+
+## 自检
+
+- check-launchers.js / check-portable.js 增加 .lnk 与 vbs 编码断言
+  （vbs 必须 UTF-16LE+BOM、lnk 不得含 pythonw/toolkit 路径）
+- 21 项全过；实测双击启动 5.1s 就绪、关闭 1s 返回、窗口可见

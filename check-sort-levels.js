@@ -77,14 +77,14 @@ console.log('账号仍是最外层:');
 console.log('真实数据（截图场景，单系统账号组）:');
 {
   const cards = [
-    card('银星二号', 'a1546296221@163.com', false),
-    card('银月八号', 'a1546296221@163.com', true),
-    card('银月六号', 'a1546296221@163.com', true),
-    card('银月七号', 'a1546296221@163.com', true),
-    card('红月八号', 'b1546296221@163.com', true),
-    card('红月六号', 'b1546296221@163.com', true),
-    card('红月七号', 'b1546296221@163.com', true),
-    card('红月五号', 'b1546296221@163.com', true),
+    card('银星二号', 'example001@example.com', false),
+    card('银月八号', 'example001@example.com', true),
+    card('银月六号', 'example001@example.com', true),
+    card('银月七号', 'example001@example.com', true),
+    card('红月八号', 'example002@example.com', true),
+    card('红月六号', 'example002@example.com', true),
+    card('红月七号', 'example002@example.com', true),
+    card('红月五号', 'example002@example.com', true),
   ];
   const out = order(cards, 'android', 'id');
   // a 账号：安卓 6/7/8 先，iOS 二号（iOS 在前？否，安卓优先）→ 二号在组末

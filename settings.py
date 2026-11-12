@@ -8,8 +8,8 @@ settings.json 结构：
     {
       "default": "local",              // 默认使用哪个预设的 name
       "roots": [
-        {"name": "local",  "path": "E:\\\\git_src\\\\OnmyojiAutoScript"},
-        {"name": "局域网", "path": "\\\\\\\\oas\\\\OnmyojiAutoScript-easy-install"}
+        {"name": "local",  "path": "E:\\\\你的\\\\OAS目录"},
+        {"name": "局域网", "path": "\\\\\\\\主机名\\\\共享名"}
       ]
     }
 
@@ -169,8 +169,8 @@ def is_network_path(path: str) -> bool:
 def _unc_host(path: str) -> str:
     """从 UNC 路径里取出主机名；不是 UNC 就返回空串
 
-    \\\\oas\\share\\sub  ->  'oas'
-    //oas/share        ->  'oas'
+    \\\\server\\share\\sub  ->  'server'
+    //server/share        ->  'server'
     """
     text = str(path or '').strip()
     if not is_network_path(text):

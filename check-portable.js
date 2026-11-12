@@ -5,7 +5,7 @@
  *  - server.py 不用固定层级的 parents[N] 推断仓库根（改为逐级向上找 config/）
  *  - 启动 bat 不硬编码 ..\..\..\toolkit（改为 _find_python.bat 向上搜索 + PATH + 环境变量）
  *  - _find_python.bat 的 endlocal&set 之间没有空格（空格会进变量值）
- *  - install-shortcut.ps1 的仓库根解析不是硬编码层级
+ *  - 根目录 .lnk 指向 wscript + 本目录 vbs，不写死解释器路径
  *  - bat 仍然全是纯 ASCII
  */
 'use strict';
@@ -58,7 +58,7 @@ console.log('解释器查找（bat）:');
     spacingIssues.length === 0,
     spacingIssues[0]);
 
-  for (const name of ['启动账号管理.bat', '启动账号管理（无窗口）.bat', '关闭账号管理.bat']) {
+  for (const name of ['启动账号管理.bat', '启动账号管理（独立窗口）.bat', '关闭账号管理.bat']) {
     const text = readAscii(name);
     check(name + ' 调用 _find_python.bat', /call "%~dp0_find_python\.bat"/.test(text));
     check(name + ' 不再硬编码 ..\\..\\..\\toolkit',
@@ -69,21 +69,26 @@ console.log('解释器查找（bat）:');
   }
 }
 
-console.log('快捷方式安装脚本:');
+console.log('根目录快捷方式:');
 {
-  const ps1 = read('install-shortcut.ps1');
-  check('有 -TargetDir 测试参数', /\[string\]\$TargetDir/.test(ps1));
-  check('按工具目录定位 server.py（不假设仓库层级）',
-    /Join-Path \$scriptDir 'server\.py'/.test(ps1));
-  check('不再硬编码 ..\..\.. 当仓库根',
-    !/Join-Path \$scriptDir '\.\.\\\.\.\\\.\.'/.test(ps1));
-  check('解释器按便携/旧布局/向上/PATH 顺序查找',
-    /python\\pythonw\.exe/.test(ps1) && /toolkit\\pythonw\.exe/.test(ps1));
-  check('支持 ACCOUNT_MANAGER_PYTHONW 环境变量',
-    /ACCOUNT_MANAGER_PYTHONW/.test(ps1));
-  const buf = fs.readFileSync(path.join(dir, 'install-shortcut.ps1'));
-  check('保持 UTF-8 BOM',
-    buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf);
+  // .lnk 指向 wscript + 同目录 vbs，解释器由 _find_python.bat 动态找，
+  // 换机器/换目录都不会失效。这里只校验"没写死解释器路径"这个关键约束。
+  const name = '启动账号管理（独立窗口）.lnk';
+  const p = path.join(dir, name);
+  check(name + ' 存在', fs.existsSync(p));
+  if (fs.existsSync(p)) {
+    const buf = fs.readFileSync(p);
+    const all = buf.toString('latin1') + '\n' + buf.toString('utf16le');
+    check(name + ' 不硬编码解释器路径',
+      !/pythonw/i.test(all) && !/toolkit/i.test(all));
+    check(name + ' 目标是 wscript', /wscript/i.test(all));
+  }
+  // vbs 必须 UTF-16LE + BOM：否则 WSH 按 GBK 读 UTF-8，中文路径全乱码
+  const vbs = '启动账号管理（独立窗口）.vbs';
+  const vb = fs.readFileSync(path.join(dir, vbs));
+  check(vbs + ' 是 UTF-16LE + BOM',
+    vb.length >= 2 && vb[0] === 0xff && vb[1] === 0xfe,
+    'WSH 会把无 BOM 的 UTF-8 当 GBK 读，中文路径变乱码');
 }
 
 console.log('运行期文件位置:');

@@ -41,7 +41,7 @@ if (!oasRoot) {
 [
   ['core.js 单元测试（汉字数字/排序/状态/解析）', 'core.test.js'],
   ['DOM 一致性（id 引用/静态资源/脚本顺序）', 'check-dom.js'],
-  ['主题一致性（配色与 xianyu 账号管理对齐）', 'check-theme.js'],
+  ['主题一致性（配色与既定暖色主题对齐）', 'check-theme.js'],
   ['三级排序层级（账号 → 系统 → 编号）', 'check-sort-levels.js'],
   ['运行状态展示（今天已执行/未执行/哨兵值）', 'check-run-state-ui.js'],
   ['排序链路（页面下拉 → 排序结果）', 'check-sort-ui.js'],

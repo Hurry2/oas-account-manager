@@ -125,14 +125,14 @@ check('按编号而非拼音（二号 < 五号 < 六号 < 八号）', () => {
 });
 check('你的真实数据（账号 → 系统 → 编号）', () => {
   const cards = [
-    card('银星二号', 'a1546296221@163.com', false),
-    card('银月八号', 'a1546296221@163.com', true),
-    card('银月六号', 'a1546296221@163.com', true),
-    card('银月七号', 'a1546296221@163.com', true),
-    card('红月八号', 'b1546296221@163.com', true),
-    card('红月六号', 'b1546296221@163.com', true),
-    card('红月七号', 'b1546296221@163.com', true),
-    card('红月五号', 'b1546296221@163.com', true),
+    card('银星二号', 'example001@example.com', false),
+    card('银月八号', 'example001@example.com', true),
+    card('银月六号', 'example001@example.com', true),
+    card('银月七号', 'example001@example.com', true),
+    card('红月八号', 'example002@example.com', true),
+    card('红月六号', 'example002@example.com', true),
+    card('红月七号', 'example002@example.com', true),
+    card('红月五号', 'example002@example.com', true),
   ];
   // 安卓优先：a 账号的安卓 6/7/8 先出，iOS 的二号排在该组末尾
   const out = Core.sortCards(cards, 'android', 'id').map((c) => c.character);

@@ -16,10 +16,12 @@ if not exist "%APP%" goto no_app
 
 title OAS Account List Manager - Stop
 "%PY%" -B "%APP%" --stop
-echo.
-pause
+set "CODE=%ERRORLEVEL%"
+rem No pause here: this script is normally double-clicked and should just
+rem close when done. A stray pause leaves a console window waiting for Enter,
+rem which looks like the tool hung.
 popd
-exit /b 0
+exit /b %CODE%
 
 :no_python
 echo [ERROR] Python interpreter not found.

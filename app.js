@@ -1421,7 +1421,7 @@
     api('/api/shutdown', { method: 'POST' })
       .then(function () {
         // 服务已停，页面本身留在浏览器里；提示后由用户自行关闭标签页
-        // 配色与 xianyu 账号管理保持一致（米黄底 + 暖褐字）
+        // 配色遵循既定暖色主题（米黄底 + 暖褐字）
         document.body.style.background = '#efdfc0';
         document.body.innerHTML = '<div style="padding:40px;font:15px/1.7 \'Segoe UI\',\'Microsoft YaHei\',sans-serif;color:#43301c">'
           + '<h2 style="margin:0 0 12px">工具已退出</h2>'

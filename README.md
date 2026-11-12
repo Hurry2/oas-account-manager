@@ -35,14 +35,14 @@ setx OAS_ROOT "D:\你的OAS目录"
 
 | 方式 | 命令 |
 | --- | --- |
-| **独立应用窗口**（推荐，无地址栏） | 双击 `启动账号管理（独立窗口）.vbs` |
-| 普通浏览器标签页 | 双击 `启动账号管理.vbs` |
-| 带控制台（看日志） | 双击 `启动账号管理.bat` |
+| **独立应用窗口**（推荐，无地址栏） | 双击 `启动账号管理（独立窗口）.lnk`（或同名 `.vbs`） |
+| 普通浏览器标签页 | 双击 `启动账号管理.bat` |
 | 命令行 | `python server.py --app` |
 
 默认端口 **22299**，已在运行时会复用并直接开页面。
 
-创建桌面快捷方式：右键 `install-shortcut.ps1` → 使用 PowerShell 运行。
+根目录的 `.lnk` 指向 `wscript.exe` + 同目录的 `.vbs`，解释器由 `_find_python.bat`
+动态查找，所以**整个目录拷到别的机器也能直接双击**，不会因为解释器路径变化失效。
 
 ### 4. 退出
 
@@ -126,10 +126,10 @@ OAS 把多账号列表存成一批平铺的 key：
 
 ```powershell
 # 方式 A：命令行（临时）
-python server.py --root "E:\git_src\OnmyojiAutoScript"
+python server.py --root "<你的OAS目录>"
 
 # 方式 B：环境变量（一次性，之后双击启动器也生效）
-setx OAS_ROOT "E:\git_src\OnmyojiAutoScript"
+setx OAS_ROOT "<你的OAS目录>"
 
 # 方式 C：页面右上角「切换目标」里填路径（会写进 settings.json 记住）
 ```
@@ -149,7 +149,7 @@ setx OAS_ROOT "E:\git_src\OnmyojiAutoScript"
 OAS 跑在局域网另一台机器上时，把共享目录注册成预设即可在本机操控：
 
 ```
-\\oas\OnmyojiAutoScript-easy-install
+\\<主机名>\<共享名>
 ```
 
 两种方式：
@@ -160,7 +160,7 @@ OAS 跑在局域网另一台机器上时，把共享目录注册成预设即可�
 **B. 启动参数**：
 
 ```powershell
-python -B server.py --root "\\oas\OnmyojiAutoScript-easy-install"
+python -B server.py --root "\\<主机名>\<共享名>"
 ```
 
 已实测可用的操作：读配置列表（那台机器上的 12 个配置）、读账号卡、**保存写回**（56 张卡整表重写）、
@@ -173,7 +173,7 @@ python -B server.py --root "\\oas\OnmyojiAutoScript-easy-install"
   "default": "lan",
   "roots": [
     { "name": "local", "path": "E:\\git_src\\OnmyojiAutoScript" },
-    { "name": "lan",   "path": "\\\\oas\\OnmyojiAutoScript-easy-install" }
+    { "name": "lan",   "path": "\\\\主机名\\共享名" }
   ]
 }
 ```
@@ -190,8 +190,8 @@ python -B server.py --root "\\oas\OnmyojiAutoScript-easy-install"
 
 ### 移动时要注意的 6 点
 
-1. **桌面快捷方式是绝对路径**，移动后旧快捷方式会失效。移动完**重新运行一次** `install-shortcut.ps1`（会覆盖旧的）。
-2. **不要只移动一部分文件**。至少要带上：`server.py`、`ui.html`、`ui.css`、`app.js`、`core.js`、`_find_python.bat` 和三个启动 bat/vbs。只缺任何一个都可能起不来（`check-dom.js` 能查出来）。
+1. **根目录的 `.lnk` 是可移植的**：它指向 `wscript.exe` + 同目录的 `.vbs`，不写死解释器路径，整目录拷走就能用。但如果你另外在**桌面**建过快捷方式，那是绝对路径，移动后会失效，需要重建（或直接用根目录这个 `.lnk`）。
+2. **不要只移动一部分文件**。至少要带上：`server.py`、`ui.html`、`ui.css`、`app.js`、`core.js`、`_find_python.bat` 和启动 bat/vbs/lnk。只缺任何一个都可能起不来（`check-dom.js` 能查出来）。
 3. **`.runtime.json` 会在移动后失效**（里面记的是旧 PID 和旧路径）。如果移动前工具还在跑，先在原位置退出，或移动后执行一次 `--stop` 清掉。
 4. **`backups/` 跟着工具目录走**。移动工具等于换了一套备份历史；想保留就往新位置一起复制。
 5. **快捷方式里的工作目录**是工具目录。如果你手工改过 `.lnk` 的「起始位置」，移动后要一并改。
@@ -238,23 +238,15 @@ python -B server.py --root "\\oas\OnmyojiAutoScript-easy-install"
 
 > 普通浏览器标签页模式没有这个记忆（标签页大小由浏览器管理，页面量不准）。
 
-### 方式二：一键启动（桌面快捷方式）
+### 方式二：一键启动（根目录 .lnk）
 
-**首次使用**，创建桌面快捷方式（只需一次）：
+工具根目录自带 **`启动账号管理（独立窗口）.lnk`**，双击即开独立应用窗口（带 `--app`，无地址栏/标签栏），不会弹黑色控制台。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File install-shortcut.ps1
-```
+想放到桌面：右键这个 `.lnk` → **发送到 → 桌面快捷方式**。
 
-也可以右键 `install-shortcut.ps1` → **使用 PowerShell 运行**。加 `-StartMenu` 会同时建开始菜单项。
-
-快捷方式默认就是**独立窗口模式**（带 `--app`）。想要普通浏览器标签页：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File install-shortcut.ps1 -BrowserMode
-```
-
-之后双击桌面上的 **「OAS 账号列表管理」** 即可，不会弹黑色控制台窗口。
+> 为什么 `.lnk` 放在仓库里不会失效：它指向 `wscript.exe` + 同目录的 `.vbs`，
+> 解释器由 `_find_python.bat` 动态查找（环境变量 → `python\` → `toolkit\` → 向上找 → PATH）。
+> 所以换机器、换目录、换解释器位置都能直接用，不像指向 `pythonw.exe` 绝对路径的快捷方式那样会断。
 
 ### 怎么退出
 
@@ -289,10 +281,9 @@ powershell -ExecutionPolicy Bypass -File install-shortcut.ps1 -BrowserMode
 
 | 文件 | 特点 |
 | --- | --- |
-| `启动账号管理（独立窗口）.vbs` | **推荐**：完全静默 + 独立应用窗口（无地址栏/标签栏） |
+| `启动账号管理（独立窗口）.lnk` | **推荐**：双击即开独立应用窗口（无地址栏/标签栏），可发到桌面 |
+| `启动账号管理（独立窗口）.vbs` | 同上（`.lnk` 实际就是调它），完全静默 |
 | `启动账号管理（独立窗口）.bat` | 同上，但保留一瞬间的批处理窗口（排查问题用） |
-| `启动账号管理.vbs` | 完全静默，但用普通浏览器标签页打开 |
-| `启动账号管理（无窗口）.bat` | 用 `pythonw` 后台启动，普通标签页 |
 | `启动账号管理.bat` | **保留控制台**，能看到日志、Ctrl+C 干净退出，排查问题用这个 |
 
 重复双击不会起多个实例：检测到已在运行会直接打开页面并提示「工具已经在运行」。
@@ -341,7 +332,7 @@ python -B server.py
 
 ## 界面风格
 
-配色与 `E:\git_src\xianyu\account-manager` 保持一致（**米黄羊皮纸底 + 金棕主色**），
+配色与 另一个同风格的内部工具 保持一致（**米黄羊皮纸底 + 金棕主色**），
 两边看起来是同一套工具：
 
 | 变量 | 值 | 用途 |
@@ -482,7 +473,7 @@ i154,小号1,小号2	雅乐之邦	紫星一号
 "account_list_1": { "account": "XXX", "account_alias": "XXX", ... }
 
 // 本工具导出
-"account_list_1": { "account": "a1546296221@163.com", "account_alias": "", ... }
+"account_list_1": { "account": "example001@example.com", "account_alias": "", ... }
 ```
 
 两个选项：
@@ -680,7 +671,7 @@ node core.test.js
 # 静态一致性：app.js 引用的 DOM id 都存在、脚本顺序正确
 node check-dom.js
 
-# 主题一致性：配色与 xianyu 账号管理对齐（防被改回冷色系）
+# 主题一致性：配色与既定暖色主题对齐（防被改回冷色系）
 node check-theme.js
 
 # 按钮不溢出：卡片网格列数够不够、按钮有没有裁剪文字
@@ -741,7 +732,7 @@ node check-portable.js
 | `core.js` | 纯逻辑：汉字数字解析 / 排序 / 粘贴解析 / 去重 / 统计（浏览器和 node 共用） |
 | `core.test.js` | `core.js` 单元测试 |
 | `check-dom.js` | HTML/JS 静态一致性检查 |
-| `check-theme.js` | 主题一致性（配色与 xianyu 账号管理对齐） |
+| `check-theme.js` | 主题一致性（配色与既定暖色主题对齐） |
 | `check-button-fit.js` | 按钮不溢出（网格列数够、不裁剪文字） |
 | `check-grid-cols.js` | 每行卡片数（固定 4/8 列 + 记忆 + 白名单校验） |
 | `check-account-switch.js` | 切号任务适配（轮换指针越界归零 / 只读信息展示） |
@@ -760,12 +751,10 @@ node check-portable.js
 | `check-window-geometry.js` | 窗口位置尺寸记忆（上报/校验/回放 + 前后端契约） |
 | `check-prefs.js` | 偏好记忆（localStorage 协议 + 恢复完整性） |
 | `check-jade-filter.js` | 勾协筛选口径（过期不进类型）+ 按配置记忆开关 |
-| `_find_python.bat` | 解释器查找（环境变量 → 向上找 toolkit → PATH） |
-| `install-shortcut.ps1` | 创建桌面 / 开始菜单快捷方式（默认独立窗口，`-BrowserMode` 用普通浏览器） |
-| `启动账号管理（独立窗口）.vbs` | **推荐**：静默启动 + 独立应用窗口（无地址栏/标签栏） |
-| `启动账号管理（独立窗口）.bat` | 独立应用窗口启动（保留批处理窗口） |
-| `启动账号管理.vbs` | 静默启动（普通浏览器标签页） |
-| `启动账号管理（无窗口）.bat` | pythonw 后台启动（普通浏览器标签页） |
+| `_find_python.bat` | 解释器查找（环境变量 → `python\` → `toolkit\` → 向上找 → PATH） |
+| `启动账号管理（独立窗口）.lnk` | **推荐**：双击即开独立应用窗口，可发送到桌面（可移植） |
+| `启动账号管理（独立窗口）.vbs` | 静默启动 + 独立应用窗口（`.lnk` 调用的就是它） |
+| `启动账号管理（独立窗口）.bat` | 独立应用窗口启动（保留批处理窗口，排查用） |
 | `启动账号管理.bat` | 带控制台启动（可看日志、Ctrl+C 退出） |
 | `关闭账号管理.bat` | 停止正在运行的实例 |
 | `.app-window/` | 独立窗口模式的浏览器配置目录（自动生成，可删） |
